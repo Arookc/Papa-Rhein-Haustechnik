@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hotel Wartungsliste</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Hotel Wartungsliste</h1>
+            <div class="team-info">
+                <div class="team-member-selector">
+                    <label for="teamMember" class="form-label">Team Mitglied:</label>
+                    <select id="teamMember" class="form-control">
+                        <option value="">Wählen Sie aus...</option>
+                        <option value="Mathias">Mathias</option>
+                        <option value="Micael">Micael</option>
+                        <option value="Michael">Michael</option>
+                    </select>
+                </div>
+                <div class="last-update">
+                    Letzte Aktualisierung: <span id="lastUpdate">--</span>
+                </div>
+                <div class="reset-control">
+                    <button id="resetBtn" class="reset-btn">Alles Zurücksetzen</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <!-- Tabs will be generated dynamically -->
+        </div>
+
+        <div class="tab-content">
+            <!-- Tab content will be generated dynamically -->
+        </div>
+
+        <div class="summary-overview">
+            <h2>Gesamtübersicht</h2>
+            <div class="progress-grid" id="progressGrid">
+                <!-- Progress bars will be generated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for notes -->
+    <div id="notesModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Notiz für Zimmer <span id="modalRoomNumber"></span></h3>
+            <textarea id="noteTextarea" placeholder="Notiz hinzufügen (z.B. Gast im Zimmer, besondere Anweisungen...)"></textarea>
+            <div class="modal-buttons">
+                <button id="saveNote">Speichern</button>
+                <button id="cancelNote">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
