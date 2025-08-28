@@ -1,110 +1,70 @@
-// Application data
+const API_URL = "https://script.google.com/macros/s/AKfycbz-UjY0fy3NI1FpXXWZKer7YXJCOicLN0jUnfqzHaszgpjFBbDjYDl6WzRbSfgFwCXKsQ/exec";
+
+// Categories and rooms as before
 const appData = {
     categories: [
-        {id: "duschlippen", name: "Duschlippen"},
-        {id: "filter", name: "filter gereinigt"},
-        {id: "wasserhahn", name: "wasserhahn einsatz"},
-        {id: "silikon", name: "silikon erneuert"},
-        {id: "sonstige", name: "sonstige mangel"}
+        {id: "Duschlippen", name: "Duschlippen"},
+        {id: "filter gereinigt", name: "filter gereinigt"},
+        {id: "wasserhahn einsatz", name: "wasserhahn einsatz"},
+        {id: "silikon erneuert", name: "silikon erneuert"},
+        {id: "sonstige mangel", name: "sonstige mangel"}
     ],
     rooms: {
         floor1: [101,102,103,104,105,106,107,108,109,110,111,113,114,115,116,117,118,119,120,121,122,123,125,127,129,131,132,133,134,136,138,140,142,144],
         floor2: [201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240],
         floor3: [301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340]
-    },
-    teamMembers: ["Mathias", "Micael", "Michael"]
+    }
 };
 
-// Application state
+// App state
 let appState = {
-    currentTab: 'duschlippen',
-    checklistData: {},
-    notes: {},
-    lastResetDate: null
+    currentTab: 'Duschlippen',
+    checklistData: {},  // {category: {room: boolean}}
+    notes: {}           // {category: {room: string}}
 };
 
-// Initialize checklist data
-function initializeChecklistData() {
-    appData.categories.forEach(category => {
-        if (!appState.checklistData[category.id]) {
-            appState.checklistData[category.id] = {};
-        }
-        if (!appState.notes[category.id]) {
-            appState.notes[category.id] = {};
-        }
-        ['floor1', 'floor2', 'floor3'].forEach(floor => {
-            appData.rooms[floor].forEach(room => {
-                if (appState.checklistData[category.id][room] === undefined) {
-                    appState.checklistData[category.id][room] = false;
-                }
-                if (!appState.notes[category.id][room]) {
-                    appState.notes[category.id][room] = '';
-                }
-            });
+// Fetch data from Google Sheets backend
+async function fetchData() {
+    try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+
+        // Initialize checklistData and notes with fetched data
+        appData.categories.forEach(cat => {
+            appState.checklistData[cat.id] = {};
+            appState.notes[cat.id] = {};
         });
-    });
-}
 
-// Check if reset is needed (every 2 months)
-function checkAutoReset() {
-    const now = new Date();
-    if (appState.lastResetDate) {
-        const lastReset = new Date(appState.lastResetDate);
-        const monthsDiff = (now.getFullYear() - lastReset.getFullYear()) * 12 + (now.getMonth() - lastReset.getMonth());
-
-        if (monthsDiff >= 2) {
-            if (confirm('Es sind mehr als 2 Monate seit dem letzten Reset vergangen. Möchten Sie alle Daten zurücksetzen für den neuen Kontrollzyklus?')) {
-                resetAllData();
-                return true;
+        data.forEach(entry => {
+            if (appState.checklistData[entry.category] && entry.room) {
+                appState.checklistData[entry.category][entry.room] = entry.checked === true || entry.checked === 'TRUE' || entry.checked === 'true';
+                appState.notes[entry.category][entry.room] = entry.note || '';
             }
-        }
-    }
-    return false;
-}
+        });
 
-// Reset all data
-function resetAllData() {
-    if (confirm('Sind Sie sicher, dass Sie alle Daten zurücksetzen möchten? Diese Aktion kann nicht rückgängig gemacht werden.')) {
-        appState.checklistData = {};
-        appState.notes = {};
-        appState.lastResetDate = new Date().toISOString();
-        initializeChecklistData();
-        saveToLocalStorage();
-        renderCurrentTabContent();
-        renderProgressOverview();
-        updateLastModified();
-        alert('Alle Daten wurden erfolgreich zurückgesetzt.');
+    } catch (error) {
+        console.error("Error fetching data from Google Sheets API:", error);
+        alert("Fehler beim Laden der Daten. Stellen Sie sicher, dass die API erreichbar ist.");
     }
 }
 
-// Save to localStorage
-function saveToLocalStorage() {
+// Send update for one checkbox or note to Google Sheets
+async function sendUpdate(category, room, checked, note) {
     try {
-        localStorage.setItem('hotelChecklist', JSON.stringify({
-            checklistData: appState.checklistData,
-            notes: appState.notes,
-            lastResetDate: appState.lastResetDate
-        }));
-    } catch (e) {
-        console.warn('Could not save to localStorage:', e);
+        const payload = {
+            category,
+            room,
+            checked,
+            note: note || ""
+        };
+        await fetch(API_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+    } catch (error) {
+        console.error("Error sending update to Google Sheets API:", error);
     }
-}
-
-// Load from localStorage
-function loadFromLocalStorage() {
-    try {
-        const saved = localStorage.getItem('hotelChecklist');
-        if (saved) {
-            const data = JSON.parse(saved);
-            appState.checklistData = data.checklistData || {};
-            appState.notes = data.notes || {};
-            appState.lastResetDate = data.lastResetDate || null;
-            return true;
-        }
-    } catch (e) {
-        console.warn('Could not load from localStorage:', e);
-    }
-    return false;
 }
 
 // Render tabs
@@ -126,7 +86,7 @@ function renderTabs() {
     });
 }
 
-// Render room checkboxes for current tab
+// Render current tab content (rooms and checkboxes + notes)
 function renderCurrentTabContent() {
     const container = document.querySelector('.tab-content');
     container.innerHTML = '';
@@ -134,21 +94,24 @@ function renderCurrentTabContent() {
     // Controls
     const controls = document.createElement('div');
     controls.className = 'controls';
+
     const selectAllBtn = document.createElement('button');
     selectAllBtn.textContent = 'Alles auswählen';
     selectAllBtn.addEventListener('click', () => setAllCheckboxes(true));
     const deselectAllBtn = document.createElement('button');
     deselectAllBtn.textContent = 'Alle abwählen';
     deselectAllBtn.addEventListener('click', () => setAllCheckboxes(false));
+
     controls.appendChild(selectAllBtn);
     controls.appendChild(deselectAllBtn);
     container.appendChild(controls);
 
-    // Render floors with rooms
+    // For each floor, render rooms grid
     ['floor1', 'floor2', 'floor3'].forEach(floor => {
         const floorLabel = document.createElement('div');
         floorLabel.className = 'floor-separator';
-        floorLabel.textContent = floor.replace('floor', 'Etage ').replace('1', '1 (Zimmer 101-144)').replace('2', '2 (Zimmer 201-240)').replace('3', '3 (Zimmer 301-340)');
+        floorLabel.textContent = floor.replace('floor', 'Etage ') +
+            (floor === 'floor1' ? ' (Zimmer 101-144)' : floor === 'floor2' ? ' (Zimmer 201-240)' : ' (Zimmer 301-340)');
         container.appendChild(floorLabel);
 
         const roomGrid = document.createElement('div');
@@ -158,39 +121,35 @@ function renderCurrentTabContent() {
             const roomItem = document.createElement('div');
             roomItem.className = 'room-item';
 
-            const roomCheckbox = document.createElement('div');
-            roomCheckbox.className = 'room-checkbox';
+            const roomCheckboxDiv = document.createElement('div');
+            roomCheckboxDiv.className = 'room-checkbox';
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = `${appState.currentTab}-${room}`;
-            checkbox.checked = appState.checklistData[appState.currentTab][room];
-            checkbox.addEventListener('change', (e) => {
+            checkbox.checked = !!appState.checklistData[appState.currentTab][room];
+            checkbox.addEventListener('change', e => {
                 appState.checklistData[appState.currentTab][room] = e.target.checked;
-                saveToLocalStorage();
+                sendUpdate(appState.currentTab, room, e.target.checked, appState.notes[appState.currentTab][room]);
                 renderProgressOverview();
-                updateLastModified();
             });
 
             const label = document.createElement('label');
             label.setAttribute('for', checkbox.id);
             label.textContent = room;
 
-            roomCheckbox.appendChild(checkbox);
-            roomCheckbox.appendChild(label);
+            roomCheckboxDiv.appendChild(checkbox);
+            roomCheckboxDiv.appendChild(label);
 
             const noteBtn = document.createElement('button');
             noteBtn.className = 'note-btn';
-            noteBtn.textContent = 'Notiz';
             const hasNote = appState.notes[appState.currentTab][room] && appState.notes[appState.currentTab][room].trim() !== '';
-            if (hasNote) {
-                noteBtn.classList.add('has-note');
-                noteBtn.textContent = '📝';
-            }
+            noteBtn.textContent = hasNote ? '📝' : 'Notiz';
             noteBtn.addEventListener('click', () => openNoteModal(room));
 
-            roomItem.appendChild(roomCheckbox);
+            roomItem.appendChild(roomCheckboxDiv);
             roomItem.appendChild(noteBtn);
+
             roomGrid.appendChild(roomItem);
         });
 
@@ -198,18 +157,16 @@ function renderCurrentTabContent() {
     });
 }
 
-// Set all checkboxes in current tab
 function setAllCheckboxes(checked) {
     Object.keys(appState.checklistData[appState.currentTab]).forEach(room => {
         appState.checklistData[appState.currentTab][room] = checked;
+        sendUpdate(appState.currentTab, room, checked, appState.notes[appState.currentTab][room]);
     });
-    saveToLocalStorage();
     renderCurrentTabContent();
     renderProgressOverview();
-    updateLastModified();
 }
 
-// Open note modal
+// Notes modal functionality
 function openNoteModal(room) {
     const modal = document.getElementById('notesModal');
     const roomNumberSpan = document.getElementById('modalRoomNumber');
@@ -219,32 +176,30 @@ function openNoteModal(room) {
     noteTextarea.value = appState.notes[appState.currentTab][room] || '';
     modal.style.display = 'block';
 
-    // Store current room for saving
     modal.dataset.room = room;
     modal.dataset.category = appState.currentTab;
 }
 
-// Close note modal
 function closeNoteModal() {
     const modal = document.getElementById('notesModal');
     modal.style.display = 'none';
 }
 
-// Save note
-function saveNote() {
+async function saveNote() {
     const modal = document.getElementById('notesModal');
     const noteTextarea = document.getElementById('noteTextarea');
     const room = modal.dataset.room;
     const category = modal.dataset.category;
 
-    appState.notes[category][room] = noteTextarea.value;
-    saveToLocalStorage();
+    const newNote = noteTextarea.value;
+    appState.notes[category][room] = newNote;
+
+    await sendUpdate(category, room, appState.checklistData[category][room], newNote);
     closeNoteModal();
-    renderCurrentTabContent(); // Refresh to update note button appearance
-    updateLastModified();
+    renderCurrentTabContent();
+    renderProgressOverview();
 }
 
-// Render progress overview
 function renderProgressOverview() {
     const progressGrid = document.getElementById('progressGrid');
     progressGrid.innerHTML = '';
@@ -263,13 +218,11 @@ function renderProgressOverview() {
         const progressFill = document.createElement('div');
         progressFill.className = 'progress-fill';
 
-        const totalRooms = Object.keys(appState.checklistData[category.id]).length;
-        const completedCount = Object.values(appState.checklistData[category.id]).filter(val => val).length;
-        const progressPercent = totalRooms > 0 ? (completedCount / totalRooms) * 100 : 0;
+        const totalRooms = Object.keys(appState.checklistData[category.id] || {}).length;
+        const completedCount = Object.values(appState.checklistData[category.id] || {}).filter(val => val).length;
+        const progressPercent = totalRooms ? (completedCount / totalRooms) * 100 : 0;
 
         progressFill.style.width = progressPercent + '%';
-
-        // Progress color coding
         if (completedCount === 0) {
             progressFill.style.backgroundColor = 'var(--color-error)';
         } else if (completedCount < totalRooms) {
@@ -292,7 +245,7 @@ function renderProgressOverview() {
     });
 }
 
-// Update last modified timestamp
+// Last modified timestamp
 function updateLastModified() {
     const now = new Date();
     const lastUpdateSpan = document.getElementById('lastUpdate');
@@ -307,7 +260,7 @@ function updateLastModified() {
     }
 }
 
-// Initialize modal event listeners
+// Modal event listeners
 function initializeModal() {
     const modal = document.getElementById('notesModal');
     const closeBtn = modal.querySelector('.close');
@@ -318,7 +271,6 @@ function initializeModal() {
     cancelBtn.addEventListener('click', closeNoteModal);
     saveBtn.addEventListener('click', saveNote);
 
-    // Close modal when clicking outside
     window.addEventListener('click', (event) => {
         if (event.target === modal) {
             closeNoteModal();
@@ -326,44 +278,17 @@ function initializeModal() {
     });
 }
 
-// Initialize reset button
-function initializeResetButton() {
-    const resetBtn = document.getElementById('resetBtn');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', resetAllData);
-    }
-}
-
 // Initialization
-function init() {
-    // Load saved data first
-    loadFromLocalStorage();
-
-    // Initialize data structure
-    initializeChecklistData();
-
-    // Check if auto-reset is needed
-    checkAutoReset();
-
-    // Render interface
+async function init() {
+    // Fetch data from backend and then render UI
+    await fetchData();
     renderTabs();
     renderCurrentTabContent();
     renderProgressOverview();
     updateLastModified();
-
-    // Initialize event listeners
     initializeModal();
-    initializeResetButton();
 
-    // Set initial last reset date if not set
-    if (!appState.lastResetDate) {
-        appState.lastResetDate = new Date().toISOString();
-        saveToLocalStorage();
-    }
-
-    // Update timestamp every 60 seconds
     setInterval(updateLastModified, 60000);
 }
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
