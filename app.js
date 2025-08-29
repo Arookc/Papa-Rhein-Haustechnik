@@ -1,6 +1,6 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbz-UjY0fy3NI1FpXXWZKer7YXJCOicLN0jUnfqzHaszgpjFBbDjYDl6WzRbSfgFwCXKsQ/exec";
+// Hotel checklist synced with Google Sheets API
+const API_URL = "https://script.google.com/macros/s/AKfycbwHhKLCJJV8RCd4FLNJIbpEsqo59wi705qyN2jVckS7V43MR4kubykveESQEdAEamnB/exec";
 
-// Categories and rooms as before
 const appData = {
     categories: [
         {id: "Duschlippen", name: "Duschlippen"},
@@ -16,25 +16,24 @@ const appData = {
     }
 };
 
-// App state
 let appState = {
     currentTab: 'Duschlippen',
-    checklistData: {},  // {category: {room: boolean}}
-    notes: {}           // {category: {room: string}}
+    checklistData: {},
+    notes: {}
 };
 
-// Fetch data from Google Sheets backend
 async function fetchData() {
     try {
         const response = await fetch(API_URL);
         const data = await response.json();
 
-        // Initialize checklistData and notes with fetched data
+        // Initialize data structures
         appData.categories.forEach(cat => {
             appState.checklistData[cat.id] = {};
             appState.notes[cat.id] = {};
         });
 
+        // Populate from API data
         data.forEach(entry => {
             if (appState.checklistData[entry.category] && entry.room) {
                 appState.checklistData[entry.category][entry.room] = entry.checked === true || entry.checked === 'TRUE' || entry.checked === 'true';
@@ -48,7 +47,6 @@ async function fetchData() {
     }
 }
 
-// Send update for one checkbox or note to Google Sheets
 async function sendUpdate(category, room, checked, note) {
     try {
         const payload = {
@@ -67,7 +65,6 @@ async function sendUpdate(category, room, checked, note) {
     }
 }
 
-// Render tabs
 function renderTabs() {
     const tabsContainer = document.querySelector('.tabs');
     tabsContainer.innerHTML = '';
@@ -86,7 +83,6 @@ function renderTabs() {
     });
 }
 
-// Render current tab content (rooms and checkboxes + notes)
 function renderCurrentTabContent() {
     const container = document.querySelector('.tab-content');
     container.innerHTML = '';
@@ -94,19 +90,17 @@ function renderCurrentTabContent() {
     // Controls
     const controls = document.createElement('div');
     controls.className = 'controls';
-
     const selectAllBtn = document.createElement('button');
     selectAllBtn.textContent = 'Alles auswählen';
     selectAllBtn.addEventListener('click', () => setAllCheckboxes(true));
     const deselectAllBtn = document.createElement('button');
     deselectAllBtn.textContent = 'Alle abwählen';
     deselectAllBtn.addEventListener('click', () => setAllCheckboxes(false));
-
     controls.appendChild(selectAllBtn);
     controls.appendChild(deselectAllBtn);
     container.appendChild(controls);
 
-    // For each floor, render rooms grid
+    // Render floors
     ['floor1', 'floor2', 'floor3'].forEach(floor => {
         const floorLabel = document.createElement('div');
         floorLabel.className = 'floor-separator';
@@ -145,11 +139,13 @@ function renderCurrentTabContent() {
             noteBtn.className = 'note-btn';
             const hasNote = appState.notes[appState.currentTab][room] && appState.notes[appState.currentTab][room].trim() !== '';
             noteBtn.textContent = hasNote ? '📝' : 'Notiz';
+            if (hasNote) {
+                noteBtn.classList.add('has-note');
+            }
             noteBtn.addEventListener('click', () => openNoteModal(room));
 
             roomItem.appendChild(roomCheckboxDiv);
             roomItem.appendChild(noteBtn);
-
             roomGrid.appendChild(roomItem);
         });
 
@@ -166,7 +162,6 @@ function setAllCheckboxes(checked) {
     renderProgressOverview();
 }
 
-// Notes modal functionality
 function openNoteModal(room) {
     const modal = document.getElementById('notesModal');
     const roomNumberSpan = document.getElementById('modalRoomNumber');
@@ -245,7 +240,6 @@ function renderProgressOverview() {
     });
 }
 
-// Last modified timestamp
 function updateLastModified() {
     const now = new Date();
     const lastUpdateSpan = document.getElementById('lastUpdate');
@@ -260,7 +254,6 @@ function updateLastModified() {
     }
 }
 
-// Modal event listeners
 function initializeModal() {
     const modal = document.getElementById('notesModal');
     const closeBtn = modal.querySelector('.close');
@@ -278,9 +271,7 @@ function initializeModal() {
     });
 }
 
-// Initialization
 async function init() {
-    // Fetch data from backend and then render UI
     await fetchData();
     renderTabs();
     renderCurrentTabContent();
